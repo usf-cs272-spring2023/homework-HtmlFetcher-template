@@ -273,7 +273,7 @@ public class HtmlFetcherTest {
 			Assertions.assertTimeoutPreemptively(TIMEOUT,
 					() -> {
 						String html = HtmlFetcher.fetch(link);
-						Assertions.assertEquals(expected.strip(), html.strip());
+						compareText(expected, html);
 					});
 		}
 
@@ -293,7 +293,7 @@ public class HtmlFetcherTest {
 			Assertions.assertTimeoutPreemptively(TIMEOUT,
 					() -> {
 						String html = HtmlFetcher.fetch(link);
-						Assertions.assertEquals(expected.strip(), html.strip());
+						compareText(expected, html);
 					});
 		}
 	}
@@ -347,7 +347,7 @@ public class HtmlFetcherTest {
 
 				Path hello = Path.of("src", "test", "resources", "hello.html");
 				String expected = Files.readString(hello, StandardCharsets.UTF_8);
-				Assertions.assertEquals(expected.strip(), html.strip());
+				compareText(expected, html);
 			});
 		}
 	}
@@ -426,5 +426,25 @@ public class HtmlFetcherTest {
 			int actual = HtmlFetcher.getStatusCode(headers);
 			Assertions.assertEquals(code, actual);
 		});
+	}
+
+	/**
+	 * Cleans whitespace and then compares the actual text to the expected.
+	 *
+	 * @param expected the expected text
+	 * @param actual the actual text
+	 */
+	public static void compareText(String expected, String actual) {
+		Assertions.assertEquals(cleanWhitespace(expected), cleanWhitespace(actual));
+	}
+
+	/**
+	 * Cleans up whitespace for comparison.
+	 *
+	 * @param text the text to clean
+	 * @return the cleaned text
+	 */
+	public static String cleanWhitespace(String text) {
+		return text.strip().replaceAll("\r\n?", "\n");
 	}
 }
