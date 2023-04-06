@@ -24,12 +24,12 @@ import javax.net.ssl.SSLSocketFactory;
  * {@link URLConnection} to fetch the headers and content from a URL on the web.
  *
  * @author CS 272 Software Development (University of San Francisco)
- * @version Fall 2022
+ * @version Spring 2023
  */
 public class HttpsFetcher {
 	/**
-	 * Fetches the headers and content for the specified URL. The content is
-	 * placed as a list of all the lines fetched under the "Content" key.
+	 * Fetches the headers and content for the specified URL. The content is placed
+	 * as a list of all the lines fetched under the "Content" key.
 	 *
 	 * @param url the url to fetch
 	 * @return a map with the headers and content
@@ -71,8 +71,8 @@ public class HttpsFetcher {
 	}
 
 	/**
-	 * Uses a {@link Socket} to open a connection to the web server associated
-	 * with the provided URL. Supports HTTP and HTTPS connections.
+	 * Uses a {@link Socket} to open a connection to the web server associated with
+	 * the provided URL. Supports HTTP and HTTPS connections.
 	 *
 	 * @param url the url to connect
 	 * @return a socket connection for that url
@@ -102,7 +102,7 @@ public class HttpsFetcher {
 	 */
 	public static void printGetRequest(PrintWriter writer, URL url) throws IOException {
 		String host = url.getHost();
-		String resource = url.getFile().isEmpty() ? "/" : url.getFile();
+		String resource = url.getFile().isBlank() ? "/" : url.getFile();
 
 		writer.printf("GET %s HTTP/1.1\r\n", resource);
 		writer.printf("Host: %s\r\n", host);
@@ -113,8 +113,8 @@ public class HttpsFetcher {
 
 	/**
 	 * Gets the header fields from a reader associated with a socket connection.
-	 * Requires that the socket reader has not yet been used, otherwise this
-	 * method will return unpredictable results.
+	 * Requires that the socket reader has not yet been used, otherwise this method
+	 * will return unpredictable results.
 	 *
 	 * @param response a reader created from a socket connection
 	 * @return a map of header fields to a list of header values
@@ -148,7 +148,8 @@ public class HttpsFetcher {
 	 * @throws Exception if unable to fetch url
 	 */
 	public static void main(String[] args) throws Exception {
-		String[] urls = new String[] { "http://www.cs.usfca.edu/", // 302 -> https
+		String[] urls = new String[] {
+				"http://www.cs.usfca.edu/", // 302 -> https
 				"https://www.cs.usfca.edu/", // 302 -> myusf
 				"https://www.cs.usfca.edu/~cs272/", // 200
 				"https://www.cs.usfca.edu/~cs272/simple/double_extension.html.txt", // text/plain
@@ -157,7 +158,6 @@ public class HttpsFetcher {
 
 		for (String url : urls) {
 			System.out.println(url);
-
 			var results = fetchUrl(url);
 
 			for (var entry : results.entrySet()) {

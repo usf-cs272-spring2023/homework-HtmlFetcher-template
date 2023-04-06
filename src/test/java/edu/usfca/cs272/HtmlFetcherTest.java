@@ -2,6 +2,7 @@ package edu.usfca.cs272;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
 import org.junit.platform.launcher.TagFilter;
@@ -32,7 +34,7 @@ import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
  * Tests the {@link HtmlFetcher} class.
  *
  * @author CS 272 Software Development (University of San Francisco)
- * @version Fall 2022
+ * @version Spring 2023
  */
 @TestMethodOrder(MethodName.class)
 public class HtmlFetcherTest {
@@ -50,9 +52,6 @@ public class HtmlFetcherTest {
 	 * Focus on one test or one group of tests at a time instead. If you do that,
 	 * you will not have anything to worry about!
 	 */
-
-	/** How long to wait for individual tests to complete. */
-	public static final Duration TIMEOUT = Duration.ofSeconds(45);
 
 	/**
 	 * Tests the {@link HtmlFetcher#isHtml(Map)} method.
@@ -73,18 +72,18 @@ public class HtmlFetcherTest {
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/no_extension",
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/double_extension.html.txt",
-				"https://usf-cs272-fall2022.github.io/project-web/input/guten/1661-h/images/cover.jpg"
+			"input/simple/no_extension",
+			"input/simple/double_extension.html.txt",
+			"input/guten/1661-h/images/cover.jpg"
 		})
 		@Order(1)
 		public void testNotHtml(String link) throws IOException {
-			URL url = new URL(link);
-			HttpURLConnection.setFollowRedirects(false);
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
 
 			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
-				Map<String, List<String>> headers = url.openConnection().getHeaderFields();
-				Assertions.assertFalse(HtmlFetcher.isHtml(headers));
+				Map<String, List<String>> headers = getHeaders(url);
+				Assertions.assertFalse(HtmlFetcher.isHtml(headers), () -> debug(url, headers));
 			});
 		}
 
@@ -99,20 +98,22 @@ public class HtmlFetcherTest {
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/",
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/empty.html",
-				"https://usf-cs272-fall2022.github.io/project-web/input/birds/falcon.html",
-				"https://usf-cs272-fall2022.github.io/project-web/input/birds/falcon.html#file=hello.jpg",
-				"https://www.cs.usfca.edu/~cs272/redirect/nowhere"
+				"input",
+				"input/simple/",
+				"input/simple/empty.html",
+				"input/birds/falcon.html",
+				"input/birds/falcon.html#file=hello.jpg",
+				"https://www.cs.usfca.edu/~cs272/redirect/nowhere",
+				"https://www.cs.usfca.edu/~cs272/recurse/"
 		})
 		@Order(2)
 		public void testIsHtml(String link) throws IOException {
-			URL url = new URL(link);
-			HttpURLConnection.setFollowRedirects(false);
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
 
 			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
-				Map<String, List<String>> headers = url.openConnection().getHeaderFields();
-				Assertions.assertTrue(HtmlFetcher.isHtml(headers));
+				Map<String, List<String>> headers = getHeaders(url);
+				Assertions.assertTrue(HtmlFetcher.isHtml(headers), () -> debug(url, headers));
 			});
 		}
 	}
@@ -134,9 +135,9 @@ public class HtmlFetcherTest {
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/no_extension",
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/double_extension.html.txt",
-				"https://usf-cs272-fall2022.github.io/project-web/input/birds/yellowthroat.html"
+				"input/simple/no_extension",
+				"input/simple/double_extension.html.txt",
+				"input/birds/yellowthroat.html"
 		})
 		@Order(1)
 		public void test200(String link) throws IOException {
@@ -144,36 +145,31 @@ public class HtmlFetcherTest {
 		}
 
 		/**
-		 * Tests that the status code is 404.
+		 * Tests the status code for other codes.
 		 *
+		 * @param code the expected code
+		 * @param link the link to fetch
 		 * @throws IOException from {@link #testStatusCode(String, int)}
 		 * @see HtmlFetcher#getStatusCode(Map)
 		 */
-		@Test
+		@ParameterizedTest
+		@CsvSource({
+				"301, input",
+				"302, http://www.cs.usfca.edu/~cs272/",
+				"301, https://www.cs.usfca.edu/~cs272/redirect/loop1",
+				"404, https://www.cs.usfca.edu/~cs272/redirect/nowhere",
+				"410, https://www.cs.usfca.edu/~cs272/redirect/gone"
+		})
 		@Order(2)
-		public void test404() throws IOException {
-			String link = "https://www.cs.usfca.edu/~cs272/redirect/nowhere";
-			testStatusCode(link, 404);
-		}
-
-		/**
-		 * Tests that the status code is 410.
-		 *
-		 * @throws IOException from {@link #testStatusCode(String, int)}
-		 * @see HtmlFetcher#getStatusCode(Map)
-		 */
-		@Test
-		@Order(3)
-		public void test410() throws IOException {
-			String link = "https://www.cs.usfca.edu/~cs272/redirect/gone";
-			testStatusCode(link, 410);
+		public void testOther(int code, String link) throws IOException {
+			testStatusCode(link, code);
 		}
 	}
 
 	/**
 	 * Tests the redirect status code methods.
 	 *
-	 * @see HtmlFetcher#isRedirect(Map)
+	 * @see HtmlFetcher#getRedirect(Map)
 	 */
 	@Nested
 	@TestMethodOrder(OrderAnnotation.class)
@@ -184,7 +180,7 @@ public class HtmlFetcherTest {
 		 * @param link the link to fetch
 		 * @throws IOException from {@link #testStatusCode(String, int)}
 		 *
-		 * @see HtmlFetcher#isRedirect(Map)
+		 * @see HtmlFetcher#getRedirect(Map)
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
@@ -193,14 +189,13 @@ public class HtmlFetcherTest {
 				"https://www.cs.usfca.edu/~cs272/redirect/one",
 				"https://www.cs.usfca.edu/~cs272/redirect/two"
 		})
-		@Order(4)
+		@Order(1)
 		public void testRedirect(String link) throws IOException {
 			URL url = new URL(link);
-			HttpURLConnection.setFollowRedirects(false);
 
 			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
-				Map<String, List<String>> headers = url.openConnection().getHeaderFields();
-				Assertions.assertTrue(HtmlFetcher.isRedirect(headers));
+				Map<String, List<String>> headers = getHeaders(url);
+				Assertions.assertNotNull(HtmlFetcher.getRedirect(headers), () -> debug(url, headers));
 			});
 		}
 
@@ -210,22 +205,22 @@ public class HtmlFetcherTest {
 		 * @param link the link to fetch
 		 * @throws IOException from {@link #testStatusCode(String, int)}
 		 *
-		 * @see HtmlFetcher#isRedirect(Map)
+		 * @see HtmlFetcher#getRedirect(Map)
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/no_extension",
+				"input/simple/no_extension",
 				"https://www.cs.usfca.edu/~cs272/redirect/nowhere",
 				"https://www.cs.usfca.edu/~cs272/redirect/gone"
 		})
-		@Order(5)
+		@Order(2)
 		public void testNotRedirect(String link) throws IOException {
-			URL url = new URL(link);
-			HttpURLConnection.setFollowRedirects(false);
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
 
 			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
-				Map<String, List<String>> headers = url.openConnection().getHeaderFields();
-				Assertions.assertFalse(HtmlFetcher.isRedirect(headers));
+				Map<String, List<String>> headers = getHeaders(url);
+				Assertions.assertNull(HtmlFetcher.getRedirect(headers), () -> debug(url, headers));
 			});
 		}
 	}
@@ -244,17 +239,23 @@ public class HtmlFetcherTest {
 		 * null value.
 		 *
 		 * @param link the link to fetch
+		 * @throws MalformedURLException from {@link URL#URL(String)}
 		 */
 		@ParameterizedTest
 		@ValueSource(strings = {
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/no_extension",
-				"https://usf-cs272-fall2022.github.io/project-web/input/simple/double_extension.html.txt",
+				"input/simple/no_extension",
+				"input/simple/double_extension.html.txt",
 				"https://www.cs.usfca.edu/~cs272/redirect/nowhere"
 		})
 		@Order(1)
-		public void testNotValidHtml(String link) {
-			Assertions.assertTimeoutPreemptively(TIMEOUT,
-					() -> { String html = HtmlFetcher.fetch(link); Assertions.assertNull(html); });
+		public void testNotValidHtml(String link) throws MalformedURLException {
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
+
+			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
+				String html = HtmlFetcher.fetch(url);
+				Assertions.assertNull(html, url.toString());
+			});
 		}
 
 		/**
@@ -265,16 +266,17 @@ public class HtmlFetcherTest {
 		@Test
 		@Order(2)
 		public void testHtmlYellow() throws IOException {
-			String link = "https://usf-cs272-fall2022.github.io/project-web/input/birds/yellowthroat.html";
+			String link = "input/birds/yellowthroat.html";
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
 
-			Path yellow = Path.of("src", "test", "resources", "yellowthroat.html");
-			String expected = Files.readString(yellow, StandardCharsets.UTF_8);
+			Path file = Path.of("src", "test", "resources", "yellowthroat.html");
+			String expected = Files.readString(file, StandardCharsets.UTF_8);
 
-			Assertions.assertTimeoutPreemptively(TIMEOUT,
-					() -> {
-						String html = HtmlFetcher.fetch(link);
-						compareText(expected, html);
-					});
+			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
+				String html = HtmlFetcher.fetch(url);
+				compareText(expected, html);
+			});
 		}
 
 		/**
@@ -285,16 +287,17 @@ public class HtmlFetcherTest {
 		@Test
 		@Order(3)
 		public void testHtmlJava() throws IOException {
-			String link = "https://usf-cs272-fall2022.github.io/project-web/docs/api/allclasses-index.html";
+			String link = "docs/api/allclasses-index.html";
+			URL base = new URL(GITHUB);
+			URL url = new URL(base, link);
 
-			Path yellow = Path.of("src", "test", "resources", "allclasses-index.html");
-			String expected = Files.readString(yellow, StandardCharsets.UTF_8);
+			Path file = Path.of("src", "test", "resources", "allclasses-index.html");
+			String expected = Files.readString(file, StandardCharsets.UTF_8);
 
-			Assertions.assertTimeoutPreemptively(TIMEOUT,
-					() -> {
-						String html = HtmlFetcher.fetch(link);
-						compareText(expected, html);
-					});
+			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
+				String html = HtmlFetcher.fetch(url);
+				compareText(expected, html);
+			});
 		}
 	}
 
@@ -307,7 +310,6 @@ public class HtmlFetcherTest {
 	@Nested
 	@TestMethodOrder(OrderAnnotation.class)
 	public class E_FetchRedirectTests {
-
 		/**
 		 * Tests that null is returned when a link does not resolve within a specific
 		 * number of redirects.
@@ -322,8 +324,10 @@ public class HtmlFetcherTest {
 		public void testUnsuccessfulRedirect(int redirects) {
 			String one = "https://www.cs.usfca.edu/~cs272/redirect/one";
 
-			Assertions.assertTimeoutPreemptively(TIMEOUT,
-					() -> { String html = HtmlFetcher.fetch(one, redirects); Assertions.assertNull(html); });
+			Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
+				String html = HtmlFetcher.fetch(one, redirects);
+				Assertions.assertNull(html);
+			});
 		}
 
 		/**
@@ -418,14 +422,35 @@ public class HtmlFetcherTest {
 	 * @see HtmlFetcher#getStatusCode(Map)
 	 */
 	public static void testStatusCode(String link, int code) throws IOException {
-		URL url = new URL(link);
-		HttpURLConnection.setFollowRedirects(false);
+		URL base = new URL(GITHUB);
+		URL url = new URL(base, link);
 
 		Assertions.assertTimeoutPreemptively(TIMEOUT, () -> {
-			Map<String, List<String>> headers = url.openConnection().getHeaderFields();
+			Map<String, List<String>> headers = getHeaders(url);
 			int actual = HtmlFetcher.getStatusCode(headers);
-			Assertions.assertEquals(code, actual);
+			Assertions.assertEquals(code, actual, () -> debug(url, headers));
 		});
+	}
+
+	/**
+	 * Use built-in Java URL connection to get headers for debugging.
+	 *
+	 * @param url the url to fetch
+	 * @return the headers
+	 * @throws IOException if unable to connect
+	 */
+	public static Map<String, List<String>> getHeaders(URL url) throws IOException {
+		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		connection.setInstanceFollowRedirects(false);
+		connection.setRequestProperty("Connection", "close");
+		connection.connect();
+
+		try {
+			return connection.getHeaderFields();
+		}
+		finally {
+			connection.disconnect();
+		}
 	}
 
 	/**
@@ -447,4 +472,34 @@ public class HtmlFetcherTest {
 	public static String cleanWhitespace(String text) {
 		return text.strip().replaceAll("\r\n?", "\n");
 	}
+
+	/**
+	 * Produces output for debugging.
+	 *
+	 * @param url the url
+	 * @param headers the headers
+	 * @return the output
+	 */
+	public static final String debug(URL url, Map<String, List<String>> headers) {
+		StringBuilder output = new StringBuilder();
+		output.append("\nURL:\n");
+		output.append(url.toString());
+		output.append("\n\nHeaders:\n");
+
+		for (var entry : headers.entrySet()) {
+			output.append(entry.getKey());
+			output.append(" -> ");
+			output.append(entry.getValue());
+			output.append("\n");
+		}
+
+		output.append("\n");
+		return output.toString();
+	}
+
+	/** Base URL for the GitHub test website. */
+	public static final String GITHUB = "https://usf-cs272-spring2023.github.io/project-web/";
+
+	/** How long to wait for individual tests to complete. */
+	public static final Duration TIMEOUT = Duration.ofSeconds(45);
 }
